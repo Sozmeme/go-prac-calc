@@ -1,7 +1,10 @@
 package calc
 
+import "sync"
+
 type Calculator struct {
-	vars map[string]int64
+	vars   sync.Map
+	ready  map[string]*sync.WaitGroup
 }
 
 type Instruction struct {

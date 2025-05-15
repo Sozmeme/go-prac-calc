@@ -3,13 +3,39 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"prac/calc"
+	"prac/grpcserver"
+	"sync"
+
+	pb "prac/proto"
+
+	"google.golang.org/grpc"
 )
 
-func calculateHandler(calculator *calc.Calculator) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func main() {
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		startHTTPServer()
+	}()
+
+	go func() {
+		defer wg.Done()
+		startGRPCServer()
+	}()
+
+	wg.Wait()
+}
+
+func startHTTPServer() {
+	http.HandleFunc("/calculate", func(w http.ResponseWriter, r *http.Request) {
 		var instructions []calc.Instruction
+		calculator := calc.NewCalculator()
 		if err := json.NewDecoder(r.Body).Decode(&instructions); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -24,14 +50,22 @@ func calculateHandler(calculator *calc.Calculator) http.HandlerFunc {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"items": results,
 		})
-	}
+	})
+
+	fmt.Println("HTTP server started at :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func main() {
+func startGRPCServer() {
 	calculator := calc.NewCalculator()
+	lis, err := net.Listen("tcp", ":9090")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
 
-	http.HandleFunc("/calculate", calculateHandler(calculator))
+	grpcServer := grpc.NewServer()
+	pb.RegisterCalculatorServiceServer(grpcServer, grpcserver.NewCalculatorServer(calculator))
 
-	fmt.Println("Server started at :8080")
-	http.ListenAndServe(":8080", nil)
+	fmt.Println("gRPC server started at :9090")
+	log.Fatal(grpcServer.Serve(lis))
 }

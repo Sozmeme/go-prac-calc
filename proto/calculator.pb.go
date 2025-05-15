@@ -4,7 +4,7 @@
 // 	protoc        v6.31.0--rc2
 // source: grpc/calculator.proto
 
-package grpc
+package proto
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"

@@ -7,7 +7,10 @@ import (
 )
 
 func NewCalculator() *Calculator {
-	return &Calculator{vars: make(map[string]int64)}
+	return &Calculator{
+		vars:  sync.Map{},
+		ready: make(map[string]*sync.WaitGroup),
+	}
 }
 
 var operations = map[string]func(int64, int64) int64{
@@ -17,120 +20,84 @@ var operations = map[string]func(int64, int64) int64{
 }
 
 func (c *Calculator) Calculate(instructions []Instruction) ([]Result, error) {
-	var results []Result
-
 	var calcOps []Instruction
-	printQueue := make([]Instruction, 0)
+	var printOps []Instruction
 
 	for _, instr := range instructions {
 		if instr.Type == "print" {
-			printQueue = append(printQueue, instr)
+			printOps = append(printOps, instr)
 		} else {
 			calcOps = append(calcOps, instr)
 		}
 	}
 
-	groups := groupOperations(calcOps)
+	for _, instr := range calcOps {
+		if _, exists := c.ready[instr.Var]; !exists {
+			c.ready[instr.Var] = &sync.WaitGroup{}
+			c.ready[instr.Var].Add(1)
+		}
+	}
 
 	var wg sync.WaitGroup
-	for _, group := range groups {
+	errChan := make(chan error, len(calcOps))
+
+	for _, instr := range calcOps {
 		wg.Add(1)
-		go func(grp []Instruction) {
+		go func(instr Instruction) {
 			defer wg.Done()
-			for _, op := range grp {
-				if err := c.processCalc(op); err != nil {
-					return
-				}
+			for _, dep := range getDependencies(instr) {
+				c.ready[dep].Wait()
 			}
-		}(group)
+			if err := c.processCalc(instr); err != nil {
+				errChan <- err
+				return
+			}
+			c.ready[instr.Var].Done()
+		}(instr)
 	}
 
 	go func() {
 		wg.Wait()
-		for _, printInstr := range printQueue {
-			val, ok := c.vars[printInstr.Var]
-			if !ok {
-				continue
-			}
-			results = append(results, Result{Var: printInstr.Var, Value: val})
-		}
+		close(errChan)
 	}()
 
-	wg.Wait()
+	for err := range errChan {
+		return nil, err
+	}
+
+	var results []Result
+	for _, printInstr := range printOps {
+		c.ready[printInstr.Var].Wait()
+		if val, ok := c.vars.Load(printInstr.Var); ok {
+			results = append(results, Result{Var: printInstr.Var, Value: val.(int64)})
+		}
+	}
+
 	return results, nil
 }
 
-func groupOperations(instructions []Instruction) [][]Instruction {
-	instMap := make(map[string]Instruction)
-	graph := make(map[string][]string)
-	reverseGraph := make(map[string][]string)
-
-	for _, instr := range instructions {
-		instMap[instr.Var] = instr
-
-		var deps []string
-		if v, ok := instr.Left.(string); ok {
-			deps = append(deps, v)
-		}
-		if v, ok := instr.Right.(string); ok {
-			deps = append(deps, v)
-		}
-		graph[instr.Var] = deps
-
-		for _, dep := range deps {
-			reverseGraph[dep] = append(reverseGraph[dep], instr.Var)
-		}
+func getDependencies(instr Instruction) []string {
+	var deps []string
+	if v, ok := instr.Left.(string); ok {
+		deps = append(deps, v)
 	}
-
-	visited := make(map[string]bool)
-	var groups [][]Instruction
-
-	for varName := range instMap {
-		if visited[varName] {
-			continue
-		}
-
-		// Собираем компоненту зависимых инструкций
-		groupVars := make(map[string]struct{})
-		collectComponent(varName, graph, reverseGraph, visited, groupVars)
-
-		var group []Instruction
-		for v := range groupVars {
-			group = append(group, instMap[v])
-		}
-		groups = append(groups, group)
+	if v, ok := instr.Right.(string); ok {
+		deps = append(deps, v)
 	}
-
-	return groups
+	return deps
 }
-
-func collectComponent(v string, g, rev map[string][]string, visited map[string]bool, group map[string]struct{}) {
-	if visited[v] {
-		return
-	}
-	visited[v] = true
-	group[v] = struct{}{}
-
-	for _, neighbor := range g[v] {
-		collectComponent(neighbor, g, rev, visited, group)
-	}
-	for _, neighbor := range rev[v] {
-		collectComponent(neighbor, g, rev, visited, group)
-	}
-}
-
 
 func (c *Calculator) processCalc(instr Instruction) error {
-	if _, exists := c.vars[instr.Var]; exists {
+	if _, exists := c.vars.Load(instr.Var); exists {
 		return fmt.Errorf("variable %s already exists", instr.Var)
 	}
 
-	left, err := c.getValueLocked(instr.Left)
+	left, err := c.getValue(instr.Left)
 	if err != nil {
 		return err
 	}
 
-	right, err := c.getValueLocked(instr.Right)
+	right, err := c.getValue(instr.Right)
 	if err != nil {
 		return err
 	}
@@ -140,19 +107,19 @@ func (c *Calculator) processCalc(instr Instruction) error {
 		return fmt.Errorf("unknown operation %s", instr.Op)
 	}
 
-	c.vars[instr.Var] = op(left, right)
+	c.vars.Store(instr.Var, op(left, right))
 	return nil
 }
 
-func (c *Calculator) getValueLocked(v interface{}) (int64, error) {
+func (c *Calculator) getValue(v interface{}) (int64, error) {
 	switch val := v.(type) {
 	case int64:
 		return val, nil
 	case float64:
 		return int64(val), nil
 	case string:
-		if stored, ok := c.vars[val]; ok {
-			return stored, nil
+		if stored, ok := c.vars.Load(val); ok {
+			return stored.(int64), nil
 		}
 		return 0, fmt.Errorf("variable %s not defined", val)
 	default:
