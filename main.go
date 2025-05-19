@@ -12,9 +12,17 @@ import (
 
 	pb "prac/proto"
 
+	httpSwagger "github.com/swaggo/http-swagger"
 	"google.golang.org/grpc"
+
+	_ "prac/docs" // swaggo docs
 )
 
+// @title Calculator API
+// @version 1.0
+// @description This is a simple calculator API.
+// @host localhost:8080
+// @BasePath /
 func main() {
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -32,6 +40,15 @@ func main() {
 	wg.Wait()
 }
 
+// Calculate godoc
+// @Summary Calculate operations
+// @Description Perform a batch of calculations
+// @Accept  json
+// @Produce  json
+// @Param   instructions  body  []calc.Instruction  true  "Calculation instructions"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {string} string "Bad request"
+// @Router /calculate [post]
 func startHTTPServer() {
 	http.HandleFunc("/calculate", func(w http.ResponseWriter, r *http.Request) {
 		var instructions []calc.Instruction
@@ -51,6 +68,10 @@ func startHTTPServer() {
 			"items": results,
 		})
 	})
+
+	http.HandleFunc("/swagger/", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"), // указываем путь к swagger.json
+	))
 
 	fmt.Println("HTTP server started at :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

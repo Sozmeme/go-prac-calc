@@ -1,0 +1,48 @@
+basePath: /
+definitions:
+  calc.Instruction:
+    properties:
+      op:
+        type: string
+      type:
+        type: string
+      var:
+        type: string
+      left: {}
+      right: {}
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: This is a simple calculator API.
+  title: Calculator API
+  version: "1.0"
+paths:
+  /calculate:
+    post:
+      consumes:
+      - application/json
+      description: Perform a batch of calculations
+      parameters:
+      - description: Calculation instructions
+        in: body
+        name: instructions
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/calc.Instruction'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            type: string
+      summary: Calculate operations
+swagger: "2.0"

@@ -1,0 +1,72 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "This is a simple calculator API.",
+        "title": "Calculator API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/calculate": {
+            "post": {
+                "description": "Perform a batch of calculations",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Calculate operations",
+                "parameters": [
+                    {
+                        "description": "Calculation instructions",
+                        "name": "instructions",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/calc.Instruction"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "calc.Instruction": {
+            "type": "object",
+            "properties": {
+                "op": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "var": {
+                    "type": "string"
+                },
+                "left": {},
+                "right": {}
+            }
+        }
+    }
+}

@@ -136,29 +136,11 @@ func TestComplexScenario(t *testing.T) {
 			t.Errorf("For %s expected %d, got %d", res.Var, expectedVal, res.Value)
 		}
 	}
-
-	computedVars := []struct {
-		name  string
-		value int64
-	}{
-		{"y", 60},
-		{"unusedA", 160},
-		{"unusedB", 320},
-		{"ignoreC", 57},
-	}
-
-	for _, v := range computedVars {
-		if val, ok := calc.vars.Load(v.name); !ok {
-			t.Errorf("Variable %s was not computed", v.name)
-		} else if val.(int64) != v.value {
-			t.Errorf("For %s expected %d, got %d", v.name, v.value, val)
-		}
-	}
 }
 
-func Test100IndependentOperations(t *testing.T) {
+func TestConcurrency(t *testing.T) {
 	calc := NewCalculator()
-	n := 100
+	n := 10000
 	instructions := make([]Instruction, n)
 
 	for i := 0; i < n; i++ {
@@ -184,7 +166,7 @@ func Test100IndependentOperations(t *testing.T) {
 	}
 
 	if len(results) != n {
-		t.Fatalf("Expected 100 results, got %d", len(results))
+		t.Fatalf("Expected %d results, got %d", n, len(results))
 	}
 
 	for i, res := range results {

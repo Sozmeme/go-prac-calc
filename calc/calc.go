@@ -24,10 +24,13 @@ func (c *Calculator) Calculate(instructions []Instruction) ([]Result, error) {
 	var printOps []Instruction
 
 	for _, instr := range instructions {
-		if instr.Type == "print" {
+		switch instr.Type {
+		case "print":
 			printOps = append(printOps, instr)
-		} else {
+		case "calc":
 			calcOps = append(calcOps, instr)
+		default:
+			return nil, fmt.Errorf("unknown operation: '%s'", instr.Type)
 		}
 	}
 
@@ -67,11 +70,12 @@ func (c *Calculator) Calculate(instructions []Instruction) ([]Result, error) {
 
 	var results []Result
 	for _, printInstr := range printOps {
-		c.ready[printInstr.Var].Wait()
 		if val, ok := c.vars.Load(printInstr.Var); ok {
 			results = append(results, Result{Var: printInstr.Var, Value: val.(int64)})
 		}
 	}
+
+	c.Reset()
 
 	return results, nil
 }
@@ -125,4 +129,13 @@ func (c *Calculator) getValue(v interface{}) (int64, error) {
 	default:
 		return 0, fmt.Errorf("invalid value type")
 	}
+}
+
+func (c *Calculator) Reset() {
+	c.vars.Range(func(key, value interface{}) bool {
+		c.vars.Delete(key)
+		return true
+	})
+
+	c.ready = make(map[string]*sync.WaitGroup)
 }

@@ -1,15 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
+
+	pb "prac/proto"
+
+	"google.golang.org/grpc"
 )
 
-func TestHTTPRawJSONRequest(t *testing.T) {
-
+func TestHTTP(t *testing.T) {
 	rawJSON := `[
 		{ "type": "calc", "op": "+", "var": "x", "left": 10, "right": 2 },
 		{ "type": "calc", "op": "*", "var": "y", "left": "x", "right": 5 },
@@ -67,5 +72,60 @@ func TestHTTPRawJSONRequest(t *testing.T) {
 
 	if len(response.Items) != 3 {
 		t.Errorf("Expected 3 results, got %d", len(response.Items))
+	}
+}
+
+func TestGRPC(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(
+		ctx,
+		"localhost:9090",
+		grpc.WithInsecure(),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		t.Fatalf("Failed to connect to gRPC server: %v", err)
+	}
+	defer conn.Close()
+
+	client := pb.NewCalculatorServiceClient(conn)
+
+	req := &pb.CalculationRequest{
+		Instructions: []*pb.Instruction{
+			{
+				Type:  "calc",
+				Op:    "+",
+				Var:   "x",
+				Left:  &pb.Instruction_LeftInt{LeftInt: 2},
+				Right: &pb.Instruction_RightInt{RightInt: 3},
+			},
+			{
+				Type: "print",
+				Var:  "x",
+			},
+		},
+	}
+
+	resp, err := client.Calculate(ctx, req)
+	if err != nil {
+		t.Fatalf("Calculate RPC failed: %v", err)
+	}
+
+	expected := map[string]int64{
+		"x": 5,
+	}
+
+	if len(resp.Items) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(resp.Items))
+	}
+
+	for _, item := range resp.Items {
+		if val, ok := expected[item.Var]; !ok {
+			t.Errorf("Unexpected variable in response: %s", item.Var)
+		} else if item.Value != val {
+			t.Errorf("For variable %s, expected %d, got %d", item.Var, val, item.Value)
+		}
 	}
 }
