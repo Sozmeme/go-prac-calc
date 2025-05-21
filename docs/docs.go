@@ -17,17 +17,20 @@ const docTemplate = `{
     "paths": {
         "/calculate": {
             "post": {
-                "description": "Perform a batch of calculations",
+                "description": "Perform a batch of calculations with 50ms delay per operation",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Calculator"
+                ],
                 "summary": "Calculate operations",
                 "parameters": [
                     {
-                        "description": "Calculation instructions",
+                        "description": "Array of calculation instructions",
                         "name": "instructions",
                         "in": "body",
                         "required": true,
@@ -43,12 +46,17 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/main.ResponseWrapper"
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Invalid request format",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal calculation error",
                         "schema": {
                             "type": "string"
                         }
@@ -73,6 +81,28 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "calc.Result": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "integer"
+                },
+                "var": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.ResponseWrapper": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/calc.Result"
+                    }
+                }
+            }
         }
     }
 }`
@@ -84,7 +114,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Calculator API",
-	Description:      "This is a simple calculator API.",
+	Description:      "This is a simple calculator API with both HTTP and gRPC interfaces.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

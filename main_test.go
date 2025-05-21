@@ -75,18 +75,13 @@ func TestHTTP(t *testing.T) {
 	}
 }
 
-func TestGRPC(t *testing.T) {
+func TestGRPCWithNewClient(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	conn, err := grpc.DialContext(
-		ctx,
-		"localhost:9090",
-		grpc.WithInsecure(),
-		grpc.WithBlock(),
-	)
+	conn, err := grpc.NewClient("localhost:9090")
 	if err != nil {
-		t.Fatalf("Failed to connect to gRPC server: %v", err)
+		t.Fatalf("Failed to create gRPC client: %v", err)
 	}
 	defer conn.Close()
 

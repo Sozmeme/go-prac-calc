@@ -15,12 +15,16 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 	"google.golang.org/grpc"
 
-	_ "prac/docs" // swaggo docs
+	_ "prac/docs"
 )
+
+type ResponseWrapper struct {
+	Items []calc.Result `json:"items"`
+}
 
 // @title Calculator API
 // @version 1.0
-// @description This is a simple calculator API.
+// @description This is a simple calculator API with both HTTP and gRPC interfaces.
 // @host localhost:8080
 // @BasePath /
 func main() {
@@ -42,13 +46,29 @@ func main() {
 
 // Calculate godoc
 // @Summary Calculate operations
-// @Description Perform a batch of calculations
-// @Accept  json
-// @Produce  json
-// @Param   instructions  body  []calc.Instruction  true  "Calculation instructions"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {string} string "Bad request"
+// @Description Perform a batch of calculations with 50ms delay per operation
+// @Tags Calculator
+// @Accept json
+// @Produce json
+// @Param instructions body []calc.Instruction true "Array of calculation instructions"
+// @Success 200 {object} ResponseWrapper
+// @Failure 400 {string} string "Invalid request format"
+// @Failure 500 {string} string "Internal calculation error"
 // @Router /calculate [post]
+// @Example request
+// [
+//
+//	{ "type": "calc", "op": "+", "var": "x", "left": 1, "right": 2 },
+//	{ "type": "print", "var": "x" }
+//
+// ]
+// @Example response
+//
+//	{
+//	  "items": [
+//	    { "var": "x", "value": 3 }
+//	  ]
+//	}
 func startHTTPServer() {
 	http.HandleFunc("/calculate", func(w http.ResponseWriter, r *http.Request) {
 		var instructions []calc.Instruction
@@ -64,13 +84,12 @@ func startHTTPServer() {
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"items": results,
-		})
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ResponseWrapper{Items: results})
 	})
 
 	http.HandleFunc("/swagger/", httpSwagger.Handler(
-		httpSwagger.URL("/swagger/doc.json"), // указываем путь к swagger.json
+		httpSwagger.URL("/swagger/doc.json"),
 	))
 
 	fmt.Println("HTTP server started at :8080")

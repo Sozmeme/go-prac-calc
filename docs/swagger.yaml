@@ -2,19 +2,33 @@ basePath: /
 definitions:
   calc.Instruction:
     properties:
+      left: {}
       op:
         type: string
+      right: {}
       type:
         type: string
       var:
         type: string
-      left: {}
-      right: {}
+    type: object
+  calc.Result:
+    properties:
+      value:
+        type: integer
+      var:
+        type: string
+    type: object
+  main.ResponseWrapper:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/calc.Result'
+        type: array
     type: object
 host: localhost:8080
 info:
   contact: {}
-  description: This is a simple calculator API.
+  description: This is a simple calculator API with both HTTP and gRPC interfaces.
   title: Calculator API
   version: "1.0"
 paths:
@@ -22,9 +36,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Perform a batch of calculations
+      description: Perform a batch of calculations with 50ms delay per operation
       parameters:
-      - description: Calculation instructions
+      - description: Array of calculation instructions
         in: body
         name: instructions
         required: true
@@ -38,11 +52,16 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/main.ResponseWrapper'
         "400":
-          description: Bad request
+          description: Invalid request format
+          schema:
+            type: string
+        "500":
+          description: Internal calculation error
           schema:
             type: string
       summary: Calculate operations
+      tags:
+      - Calculator
 swagger: "2.0"
